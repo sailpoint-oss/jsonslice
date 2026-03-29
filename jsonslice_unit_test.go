@@ -4,6 +4,146 @@ import (
 	"testing"
 )
 
+// TestGetEmbeddedPaths covers $-root paths referenced inside [?( )] filters only (not {{ }} templates
+// or $.x used as an array index). Paths use generic names (foo, bar, a, b, …) but match real shapes.
+func TestGetEmbeddedPaths(t *testing.T) {
+	tests := []struct {
+		name      string
+		path      string
+		wantNil   bool
+		wantPaths []string // order ignored; empty means expect non-nil slice with len 0 when wantNil is false
+	}{
+		{
+			name:    "empty path",
+			path:    "",
+			wantNil: true,
+		},
+		{
+			name:    "only root",
+			path:    "$",
+			wantNil: true,
+		},
+		{
+			name:    "does not start with dollar",
+			path:    "foo",
+			wantNil: true,
+		},
+		{
+			name:    "malformed root subscript",
+			path:    "$.[",
+			wantNil: true,
+		},
+		{
+			name:    "go template index brackets not filter embeds",
+			path:    `$.foo[{{$.bar}}]`,
+			wantNil: true,
+		},
+		{
+			name:    "dollar in array index bracket not filter variable",
+			path:    `$.foo.bar[$.baz.qux].name`,
+			wantNil: true,
+		},
+		{
+			name:      "property path no filter",
+			path:      "$.foo.bar",
+			wantPaths: []string{},
+		},
+		{
+			name:      "filter with only at references",
+			path:      `$.foo[?(@.a==1)]`,
+			wantPaths: []string{},
+		},
+		{
+			name:      "filter embeds dollar path after property compare",
+			path:      `$.foo.bar.baz[?(@.k==$.a.b.c)].d`,
+			wantPaths: []string{"$.a.b.c"},
+		},
+		{
+			name:      "same embed one fewer outer segment",
+			path:      `$.foo.bar[?(@.k==$.a.b.c)].d`,
+			wantPaths: []string{"$.a.b.c"},
+		},
+		{
+			name:      "spaces around equality before embedded path",
+			path:      `$.foo.bar[?(@.x == $.a.b)].c`,
+			wantPaths: []string{"$.a.b"},
+		},
+		{
+			name:      "spaces around equality different left property",
+			path:      `$.foo.bar[?(@.y == $.c.d)]`,
+			wantPaths: []string{"$.c.d"},
+		},
+		{
+			name:      "filter embeds path used as inner dependency",
+			path:      `$.foo.items[?(@.id==$.bar.baz)].name`,
+			wantPaths: []string{"$.bar.baz"},
+		},
+		{
+			name:      "two filters in sequence each embed dollar path",
+			path:      `$.a[?(@.x==$.b)].c[?(@.y==$.d)]`,
+			wantPaths: []string{"$.b", "$.d"},
+		},
+		{
+			name:      "filter embeds indexed dollar path",
+			path:      `$.foo.items[?(@.code != $.bar[0].code)].value`,
+			wantPaths: []string{"$.bar[0].code"},
+		},
+		{
+			name:      "same indexed embed longer outer path",
+			path:      `$.baz.qux.items[?(@.code != $.bar[0].code)].value`,
+			wantPaths: []string{"$.bar[0].code"},
+		},
+		{
+			name:      "two distinct dollar paths in one filter",
+			path:      `$.foo[?(@.a==$.b && @.c==$.d)]`,
+			wantPaths: []string{"$.b", "$.d"},
+		},
+		{
+			name:      "repeated dollar path deduplicated",
+			path:      `$.foo[?(@.a==$.b.c && @.a==$.b.c)]`,
+			wantPaths: []string{"$.b.c"},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := GetEmbeddedPaths(tc.path)
+			if tc.wantNil {
+				if got != nil {
+					t.Fatalf("GetEmbeddedPaths(%q) = %v, want nil", tc.path, got)
+				}
+				return
+			}
+			if got == nil {
+				t.Fatalf("GetEmbeddedPaths(%q) = nil, want non-nil slice", tc.path)
+			}
+			if len(tc.wantPaths) == 0 {
+				if len(got) != 0 {
+					t.Fatalf("GetEmbeddedPaths(%q) = %v, want empty slice", tc.path, got)
+				}
+				return
+			}
+			if len(got) != len(tc.wantPaths) {
+				t.Fatalf("GetEmbeddedPaths(%q) = %v (len %d), want len %d %v", tc.path, got, len(got), len(tc.wantPaths), tc.wantPaths)
+			}
+			used := make([]bool, len(got))
+			for _, w := range tc.wantPaths {
+				found := false
+				for i := range got {
+					if !used[i] && got[i] == w {
+						used[i] = true
+						found = true
+						break
+					}
+				}
+				if !found {
+					t.Fatalf("GetEmbeddedPaths(%q) = %v, missing or extra mismatch for want %q (want %v)", tc.path, got, w, tc.wantPaths)
+				}
+			}
+		})
+	}
+}
+
 func Test_AdjustBounds(t *testing.T) {
 	type Input struct{ left, right, step int }
 	type Expected struct {
