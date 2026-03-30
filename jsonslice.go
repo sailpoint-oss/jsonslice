@@ -118,6 +118,50 @@ func getEmptyNode() *tNode {
 	return nod
 }
 
+// GetEmbeddedPaths parses path and returns each distinct root-based JSONPath ($...)
+// referenced inside a [?( ... )] filter, in first-seen order. It does not read JSON.
+func GetEmbeddedPaths(path string) []string {
+	if len(path) == 0 {
+		return nil
+	}
+	if len(path) == 1 && path[0] == '$' {
+		return nil
+	}
+	if path[0] != '$' {
+		return nil
+	}
+
+	node, _, err := readRef(unspace([]byte(path)), 1, 0)
+	if err != nil {
+		repool(node)
+		return nil
+	}
+
+	paths := map[string]struct{}{}
+	n := node
+	for {
+		if n == nil {
+			break
+		}
+		if n.Filter != nil {
+			for _, tok := range n.Filter {
+				if tok.Type == xpression.VariableOperand && tok.Operand.Str[0] == '$' {
+					paths[string(tok.Operand.Str)] = struct{}{}
+				}
+			}
+		}
+		n = n.Next
+	}
+
+	repool(node)
+
+	out := make([]string, 0, len(paths))
+	for p := range paths {
+		out = append(out, p)
+	}
+	return out
+}
+
 // Get returns a part of input, matching jsonpath.
 // In terms of allocations there are two cases of retreiving data from the input:
 //  1. simple case: the result is a simple subslice of a source input.
