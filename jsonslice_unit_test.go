@@ -144,6 +144,123 @@ func TestGetEmbeddedPaths(t *testing.T) {
 	}
 }
 
+// TestGetFilterRelativePaths covers @-relative paths referenced inside [?( )] filters only.
+// It mirrors TestGetEmbeddedPaths but asserts on the current-element ("@") operands instead of
+// the root ("$") operands. Order is significant: paths are returned in first-seen order with
+// duplicates removed.
+func TestGetFilterRelativePaths(t *testing.T) {
+	tests := []struct {
+		name      string
+		path      string
+		wantNil   bool
+		wantPaths []string // order significant; empty means expect non-nil slice with len 0 when wantNil is false
+	}{
+		{
+			name:    "empty path",
+			path:    "",
+			wantNil: true,
+		},
+		{
+			name:    "only root",
+			path:    "$",
+			wantNil: true,
+		},
+		{
+			name:    "does not start with dollar",
+			path:    "foo",
+			wantNil: true,
+		},
+		{
+			name:    "malformed root subscript",
+			path:    "$.[",
+			wantNil: true,
+		},
+		{
+			name:    "go template index brackets are a parse error",
+			path:    `$.foo[{{$.bar}}]`,
+			wantNil: true,
+		},
+		{
+			name:      "property path no filter",
+			path:      "$.foo.bar",
+			wantPaths: []string{},
+		},
+		{
+			name:      "filter with single at reference",
+			path:      `$.foo[?(@.a==1)]`,
+			wantPaths: []string{"@.a"},
+		},
+		{
+			name:      "filter compares at reference to dollar path",
+			path:      `$.foo.bar.baz[?(@.k==$.a.b.c)].d`,
+			wantPaths: []string{"@.k"},
+		},
+		{
+			name:      "two at references in one filter preserve order",
+			path:      `$.foo[?(@.a==$.b && @.c==$.d)]`,
+			wantPaths: []string{"@.a", "@.c"},
+		},
+		{
+			name:      "two at references compared to literals",
+			path:      `$.foo[?(@.a==1 && @.b==2)]`,
+			wantPaths: []string{"@.a", "@.b"},
+		},
+		{
+			name:      "two filters in sequence each contribute one at reference",
+			path:      `$.a[?(@.x==1)].c[?(@.y==2)]`,
+			wantPaths: []string{"@.x", "@.y"},
+		},
+		{
+			name:      "repeated at reference deduplicated",
+			path:      `$.foo[?(@.a==1 && @.a==2)]`,
+			wantPaths: []string{"@.a"},
+		},
+		{
+			name:      "quoted at reference key",
+			path:      `$.items[?(@['first name']=="x")]`,
+			wantPaths: []string{"@['first name']"},
+		},
+		{
+			name:      "indexed at reference",
+			path:      `$.foo[?(@.a[0].b==1)]`,
+			wantPaths: []string{"@.a[0].b"},
+		},
+		{
+			name:      "bare at reference",
+			path:      `$.foo[?(@==1)]`,
+			wantPaths: []string{"@"},
+		},
+		{
+			name:      "filter with only dollar reference has no relatives",
+			path:      `$.foo[?($.a.b==1)]`,
+			wantPaths: []string{},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := GetFilterRelativePaths(tc.path)
+			if tc.wantNil {
+				if got != nil {
+					t.Fatalf("GetFilterRelativePaths(%q) = %v, want nil", tc.path, got)
+				}
+				return
+			}
+			if got == nil {
+				t.Fatalf("GetFilterRelativePaths(%q) = nil, want non-nil slice", tc.path)
+			}
+			if len(got) != len(tc.wantPaths) {
+				t.Fatalf("GetFilterRelativePaths(%q) = %v (len %d), want %v (len %d)", tc.path, got, len(got), tc.wantPaths, len(tc.wantPaths))
+			}
+			for i := range tc.wantPaths {
+				if got[i] != tc.wantPaths[i] {
+					t.Fatalf("GetFilterRelativePaths(%q) = %v, want %v (mismatch at index %d)", tc.path, got, tc.wantPaths, i)
+				}
+			}
+		})
+	}
+}
+
 func Test_AdjustBounds(t *testing.T) {
 	type Input struct{ left, right, step int }
 	type Expected struct {
