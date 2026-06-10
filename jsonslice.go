@@ -119,7 +119,7 @@ func getEmptyNode() *tNode {
 }
 
 // GetEmbeddedPaths parses path and returns each distinct root-based JSONPath ($...)
-// referenced inside a [?( ... )] filter, in first-seen order. It does not read JSON.
+// referenced inside a [?( ... )] filter, in first-seen order.
 func GetEmbeddedPaths(path string) []string {
 	if len(path) == 0 {
 		return nil
@@ -159,6 +159,51 @@ func GetEmbeddedPaths(path string) []string {
 	for p := range paths {
 		out = append(out, p)
 	}
+	return out
+}
+
+// GetFilterRelativePaths parses path and returns each distinct relative JSONPath (@...)
+// referenced inside a [?( ... )] filter, in first-seen order.
+func GetFilterRelativePaths(path string) []string {
+	if len(path) == 0 {
+		return nil
+	}
+	if len(path) == 1 && path[0] == '$' {
+		return nil
+	}
+	if path[0] != '$' {
+		return nil
+	}
+
+	node, _, err := readRef(unspace([]byte(path)), 1, 0)
+	if err != nil {
+		repool(node)
+		return nil
+	}
+
+	seen := map[string]struct{}{}
+	out := make([]string, 0)
+	n := node
+	for {
+		if n == nil {
+			break
+		}
+		if n.Filter != nil {
+			for _, tok := range n.Filter {
+				if tok.Type == xpression.VariableOperand && len(tok.Operand.Str) > 0 && tok.Operand.Str[0] == '@' {
+					s := string(tok.Operand.Str)
+					if _, ok := seen[s]; !ok {
+						seen[s] = struct{}{}
+						out = append(out, s)
+					}
+				}
+			}
+		}
+		n = n.Next
+	}
+
+	repool(node)
+
 	return out
 }
 
