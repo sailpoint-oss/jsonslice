@@ -2,6 +2,7 @@ package jsonslice
 
 import (
 	"bytes"
+	crand "crypto/rand"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -157,7 +158,6 @@ func TestFuzzyPath(t *testing.T) {
 			panic(v)
 		}
 	}()
-	rand.Seed(time.Now().UnixNano())
 	b := make([]byte, 100)
 	top := 2000000
 	fmt.Printf("\rpath fuzzy [                    ]\rpath fuzzy [")
@@ -193,7 +193,6 @@ func TestFuzzyGet(t *testing.T) {
 			panic(v)
 		}
 	}()
-	rand.Seed(time.Now().UnixNano())
 	b := make([]byte, 500)
 	top := 10000000
 	fmt.Printf("\rget fuzzy  [                    ]\rget fuzzy  [")
@@ -201,7 +200,7 @@ func TestFuzzyGet(t *testing.T) {
 		if i%(top/20) == 1 {
 			fmt.Printf(".")
 		}
-		n, err := rand.Read(b[:rand.Int()%len(b)])
+		n, err := crand.Read(b[:rand.Int()%len(b)])
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -217,7 +216,7 @@ func Test_10Mb(t *testing.T) {
 	path := "$.store.book[100000].title"
 	res, err := Get(largeData, path)
 	if compareSlices(res, expected) != 0 && err == nil {
-		t.Errorf(path + "\nexpected:\n" + string(expected) + "\ngot:\n" + string(res))
+		t.Errorf("%s", path+"\nexpected:\n"+string(expected)+"\ngot:\n"+string(res))
 	}
 }
 
@@ -359,9 +358,9 @@ func Test_Expressions(t *testing.T) {
 		t.Run(tst.Query, func(t *testing.T) {
 			res, err := Get(data, tst.Query)
 			if err != nil {
-				t.Errorf(tst.Query + " : " + err.Error())
+				t.Errorf("%s", tst.Query+" : "+err.Error())
 			} else if compareSlices(res, tst.Expected) != 0 {
-				t.Errorf(tst.Query + "\n\texpected `" + string(tst.Expected) + "`\n\tbut got  `" + string(res) + "`")
+				t.Errorf("%s", tst.Query+"\n\texpected `"+string(tst.Expected)+"`\n\tbut got  `"+string(res)+"`")
 			}
 		})
 	}
@@ -395,11 +394,11 @@ func Test_FuncNow(t *testing.T) {
 			expected, err := tst.expectedOutput(t)
 			if err != nil {
 				if actual != nil {
-					t.Errorf("\n\ttestName:" + tst.name + "testQuery:\n\t" + tst.Query + "\n\texpected `" + string("<nil>") + "`\n\tbut got  `" + string(actual) + "`")
+					t.Errorf("%s", "\n\ttestName:"+tst.name+"testQuery:\n\t"+tst.Query+"\n\texpected `"+string("<nil>")+"`\n\tbut got  `"+string(actual)+"`")
 				}
 			} else {
 				if compareSlices(actual, expected) != 0 {
-					t.Errorf("\n\ttestName:" + tst.name + "\n\ttestQuery:" + tst.Query + "\n\texpected `" + string(expected) + "`\n\tbut got  `" + string(actual) + "`")
+					t.Errorf("%s", "\n\ttestName:"+tst.name+"\n\ttestQuery:"+tst.Query+"\n\texpected `"+string(expected)+"`\n\tbut got  `"+string(actual)+"`")
 				}
 			}
 		})
@@ -479,10 +478,6 @@ func Test_FuncNowRFC3339(t *testing.T) {
 				if actual != nil {
 					t.Errorf("\n\ttestName:%s\n\ttestQuery:%s\n\texpected:<nil>\n\tbut got %s", tst.name, tst.Query, string(actual))
 				}
-			} else if err != nil {
-				if actualErr != err {
-					t.Errorf("\n\ttestName:%s\n\ttestQuery:%s\n\texpectedErr:%v\n\tbut got %v", tst.name, tst.Query, err, actualErr)
-				}
 			} else {
 				if compareSlices(actual, expected) != 0 {
 					t.Errorf("\n\ttestName:%s\n\ttestQuery:%s\n\texpected:%s\n\tbut got %s", tst.name, tst.Query, string(expected), string(actual))
@@ -552,9 +547,9 @@ func Test_AbstractComparison(t *testing.T) {
 		// println(tst.Query)
 		res, err := Get(differentTypes, tst.Query)
 		if err != nil {
-			t.Errorf(tst.Query + " : " + err.Error())
+			t.Errorf("%s", tst.Query+" : "+err.Error())
 		} else if compareSlices(res, tst.Expected) != 0 {
-			t.Errorf(tst.Query + "\n\texpected `" + string(tst.Expected) + "`\n\tbut got  `" + string(res) + "`")
+			t.Errorf("%s", tst.Query+"\n\texpected `"+string(tst.Expected)+"`\n\tbut got  `"+string(res)+"`")
 		}
 	}
 }
@@ -579,9 +574,9 @@ func Test_StringComparison(t *testing.T) {
 	for _, tst := range tests {
 		res, err := Get(tst.Data, tst.Query)
 		if err != nil {
-			t.Errorf(tst.Query + " : " + err.Error())
+			t.Errorf("%s", tst.Query+" : "+err.Error())
 		} else if compareSlices(res, tst.Expected) != 0 {
-			t.Errorf(tst.Query + "\n\texpected `" + string(tst.Expected) + "`\n\tbut got  `" + string(res) + "`")
+			t.Errorf("%s", tst.Query+"\n\texpected `"+string(tst.Expected)+"`\n\tbut got  `"+string(res)+"`")
 		}
 	}
 }
@@ -726,9 +721,9 @@ func Test_Extensions(t *testing.T) {
 		// println(tst.Query)
 		res, err := Get(tst.Base, tst.Query)
 		if err != nil {
-			t.Errorf(tst.Query + " : " + err.Error())
+			t.Errorf("%s", tst.Query+" : "+err.Error())
 		} else if compareSlices(res, tst.Expected) != 0 {
-			t.Errorf(tst.Query + "\n\texpected `" + string(tst.Expected) + "`\n\tbut got  `" + string(res) + "`")
+			t.Errorf("%s", tst.Query+"\n\texpected `"+string(tst.Expected)+"`\n\tbut got  `"+string(res)+"`")
 		}
 		if !bytes.Equal(prev, tst.Base) {
 			t.Errorf("Source json modified")
@@ -775,9 +770,9 @@ func Test_Fixes(t *testing.T) {
 	for _, tst := range tests {
 		res, err := Get(tst.Data, tst.Query)
 		if err != nil {
-			t.Errorf(tst.Query + " : " + err.Error())
+			t.Errorf("%s", tst.Query+" : "+err.Error())
 		} else if compareSlices(res, tst.Expected) != 0 {
-			t.Errorf(tst.Query + "\n\texpected `" + string(tst.Expected) + "`\n\tbut got  `" + string(res) + "`")
+			t.Errorf("%s", tst.Query+"\n\texpected `"+string(tst.Expected)+"`\n\tbut got  `"+string(res)+"`")
 		}
 	}
 }
@@ -807,9 +802,9 @@ func Test_Unicode(t *testing.T) {
 	for _, tst := range tests {
 		res, err := Get(tst.Data, tst.Query)
 		if err != nil {
-			t.Errorf(tst.Query + " : " + err.Error())
+			t.Errorf("%s", tst.Query+" : "+err.Error())
 		} else if compareSlices(res, tst.Expected) != 0 {
-			t.Errorf(tst.Query + "\n\texpected `" + string(tst.Expected) + "`\n\tbut got  `" + string(res) + "`")
+			t.Errorf("%s", tst.Query+"\n\texpected `"+string(tst.Expected)+"`\n\tbut got  `"+string(res)+"`")
 		}
 	}
 }
@@ -895,10 +890,10 @@ func Test_Errors(t *testing.T) {
 		res, err := Get(tst.Data, tst.Query)
 		if err == nil {
 			if !bytes.EqualFold(res, tst.Result) {
-				t.Errorf(tst.Query + " : `" + string(tst.Result) + "` expected, `" + string(res) + "` received")
+				t.Errorf("%s", tst.Query+" : `"+string(tst.Result)+"` expected, `"+string(res)+"` received")
 			}
 		} else if err.Error() != tst.Expected {
-			t.Errorf(tst.Query + "\n\texpected `" + string(tst.Expected) + "`\n\tbut got  `" + string(err.Error()) + "`")
+			t.Errorf("%s", tst.Query+"\n\texpected `"+string(tst.Expected)+"`\n\tbut got  `"+string(err.Error())+"`")
 		}
 	}
 }
@@ -925,10 +920,7 @@ func Benchmark_JsonSlice_ParsePath(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		node, _, _ := readRef(path, 1, 0)
 		// return nodes back to pool
-		for {
-			if node == nil {
-				break
-			}
+		for node != nil {
 			p := node.Next
 			nodePool.Put(node)
 			node = p

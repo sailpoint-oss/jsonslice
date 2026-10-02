@@ -267,7 +267,7 @@ func Test_AdjustBounds(t *testing.T) {
 		a, b, step int
 		err        bool
 	}
-	
+
 	tests := []struct {
 		Input
 		Expected
@@ -289,10 +289,13 @@ func Test_AdjustBounds(t *testing.T) {
 	}
 
 	n := 5 // slice length
-	
+
 	for _, tst := range tests {
-		a, b, step, err := adjustBounds(tst.Input.left, tst.Input.right, tst.Input.step, n)
-		if !(a == tst.Expected.a && b == tst.Expected.b && step == tst.Expected.step) || (err != nil) != tst.Expected.err {
+		// Copy the embedded structs so step is not ambiguous.
+		in := tst.Input
+		want := tst.Expected
+		a, b, step, err := adjustBounds(in.left, in.right, in.step, n)
+		if a != want.a || b != want.b || step != want.step || (err != nil) != want.err {
 			t.Errorf(
 				"adjustBounds(%v) == {%v,%v,%v,%v}, expected %v",
 				tst.Input, a, b, step, err, tst.Expected,
@@ -308,7 +311,7 @@ func Test_sliceRecurse(t *testing.T) {
 		nod      *tNode
 		expected string
 	}{
-		
+
 		{&tNode{Slice: [3]int{cEmpty, cEmpty, cEmpty}}, `"a","b","c","d","e"`}, // [:] == [::]
 		{&tNode{Slice: [3]int{2, cEmpty, cEmpty}}, `"c","d","e"`},              // [2:]
 		{&tNode{Slice: [3]int{cEmpty, 3, cEmpty}}, `"a","b","c"`},              // [:3]

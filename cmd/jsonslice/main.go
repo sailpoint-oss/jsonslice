@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"os"
 	"path/filepath"
 
@@ -20,9 +20,9 @@ func main() {
 	var err error
 
 	if len(os.Args) == 2 {
-		data, err = ioutil.ReadAll(os.Stdin)
+		data, err = io.ReadAll(os.Stdin)
 	} else {
-		data, err = ioutil.ReadFile(os.Args[2])
+		data, err = os.ReadFile(os.Args[2])
 	}
 	if err != nil {
 		fmt.Println(err)
