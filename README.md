@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.org/bhmj/jsonslice.svg?branch=master)](https://travis-ci.org/bhmj/jsonslice)
+[![CI](https://github.com/sailpoint-oss/jsonslice/actions/workflows/ci.yml/badge.svg)](https://github.com/sailpoint-oss/jsonslice/actions/workflows/ci.yml)
 [![Go Report Card](https://goreportcard.com/badge/github.com/bhmj/jsonslice)](https://goreportcard.com/report/github.com/bhmj/jsonslice)
 [![GoDoc](https://godoc.org/github.com/bhmj/jsonslice?status.svg)](https://godoc.org/github.com/bhmj/jsonslice)
 

@@ -138,19 +138,14 @@ func GetEmbeddedPaths(path string) []string {
 	}
 
 	paths := map[string]struct{}{}
-	n := node
-	for {
-		if n == nil {
-			break
-		}
+	for n := node; n != nil; n = n.Next {
 		if n.Filter != nil {
 			for _, tok := range n.Filter {
-				if tok.Type == xpression.VariableOperand && tok.Operand.Str[0] == '$' {
-					paths[string(tok.Operand.Str)] = struct{}{}
+				if tok.Type == xpression.VariableOperand && tok.Str[0] == '$' {
+					paths[string(tok.Str)] = struct{}{}
 				}
 			}
 		}
-		n = n.Next
 	}
 
 	repool(node)
@@ -183,15 +178,11 @@ func GetFilterRelativePaths(path string) []string {
 
 	seen := map[string]struct{}{}
 	out := make([]string, 0)
-	n := node
-	for {
-		if n == nil {
-			break
-		}
+	for n := node; n != nil; n = n.Next {
 		if n.Filter != nil {
 			for _, tok := range n.Filter {
-				if tok.Type == xpression.VariableOperand && len(tok.Operand.Str) > 0 && tok.Operand.Str[0] == '@' {
-					s := string(tok.Operand.Str)
+				if tok.Type == xpression.VariableOperand && len(tok.Str) > 0 && tok.Str[0] == '@' {
+					s := string(tok.Str)
 					if _, ok := seen[s]; !ok {
 						seen[s] = struct{}{}
 						out = append(out, s)
@@ -199,7 +190,6 @@ func GetFilterRelativePaths(path string) []string {
 				}
 			}
 		}
-		n = n.Next
 	}
 
 	repool(node)
@@ -231,18 +221,14 @@ func Get(input []byte, path string) ([]byte, error) {
 		return nil, errors.New(err.Error() + " at " + strconv.Itoa(i))
 	}
 
-	n := node
-	for {
-		if n == nil {
-			break
-		}
+	for n := node; n != nil; n = n.Next {
 		if n.Filter != nil {
 			for i, tok := range n.Filter {
-				if tok.Type == xpression.VariableOperand && tok.Operand.Str[0] == '$' {
+				if tok.Type == xpression.VariableOperand && tok.Str[0] == '$' {
 					// every variable has an empty token right after it for storing the result
 					result := n.Filter[i+1]
 					// evaluate root-based reference
-					val, err := Get(input, string(tok.Operand.Str))
+					val, err := Get(input, string(tok.Str))
 					if err != nil {
 						// not found or other error
 						result.Type = xpression.UndefinedOperand
@@ -251,7 +237,6 @@ func Get(input []byte, path string) ([]byte, error) {
 				}
 			}
 		}
-		n = n.Next
 	}
 
 	result, err := getValue(input, node, false)
@@ -488,12 +473,12 @@ func detectFn(path []byte, i int, nod *tNode) (bool, int, error) {
 	if len(nod.Keys) == 0 {
 		return true, i, errPathUnknownFunction
 	}
-	if !(bytes.EqualFold(nod.Keys[0], []byte("length")) ||
-		bytes.EqualFold(nod.Keys[0], []byte("count")) ||
-		bytes.EqualFold(nod.Keys[0], []byte("size")) ||
-		bytes.EqualFold(nod.Keys[0], []byte("now")) ||
-		bytes.EqualFold(nod.Keys[0], []byte("RFC3339")) ||
-		bytes.EqualFold(nod.Keys[0], []byte("JSON"))) {
+	if !bytes.EqualFold(nod.Keys[0], []byte("length")) &&
+		!bytes.EqualFold(nod.Keys[0], []byte("count")) &&
+		!bytes.EqualFold(nod.Keys[0], []byte("size")) &&
+		!bytes.EqualFold(nod.Keys[0], []byte("now")) &&
+		!bytes.EqualFold(nod.Keys[0], []byte("RFC3339")) &&
+		!bytes.EqualFold(nod.Keys[0], []byte("JSON")) {
 		return true, i, errPathUnknownFunction
 	}
 	nod.Type |= cFunction
@@ -1147,13 +1132,14 @@ func skipValue(input []byte, i int) (int, error) {
 	if i >= l {
 		return i, nil
 	}
-	if input[i] == '"' {
+	switch input[i] {
+	case '"':
 		// string
 		return skipString(input, i)
-	} else if input[i] == '{' || input[i] == '[' {
+	case '{', '[':
 		// object or array
 		return skipObject(input, i)
-	} else {
+	default:
 		if (input[i] >= '0' && input[i] <= '9') || input[i] == '-' || input[i] == '.' {
 			// number
 			i = skipNumber(input, i)
@@ -1172,7 +1158,7 @@ func skipNumber(input []byte, i int) int {
 	l := len(input)
 	for ; i < l; i++ {
 		ch := input[i]
-		if !((ch >= '0' && ch <= '9') || ch == '.' || ch == '-' || ch == 'E' || ch == 'e') {
+		if (ch < '0' || ch > '9') && ch != '.' && ch != '-' && ch != 'E' && ch != 'e' {
 			break
 		}
 	}
@@ -1213,14 +1199,15 @@ func doFunc(input []byte, nod *tNode) ([]byte, error) {
 		return []byte(strconv.Itoa(res)), nil
 
 	case bytes.Equal(word("length"), nod.Keys[0]) || bytes.Equal(word("count"), nod.Keys[0]):
-		if input[0] == '"' {
+		switch input[0] {
+		case '"':
 			res, err := lengthString(input)
 			if err != nil {
 				return nil, err
 			}
 
 			return []byte(strconv.Itoa(res)), nil
-		} else if input[0] == '[' {
+		case '[':
 			var (
 				res int
 				err error
@@ -1239,7 +1226,7 @@ func doFunc(input []byte, nod *tNode) ([]byte, error) {
 			}
 
 			return []byte(strconv.Itoa(res)), nil
-		} else {
+		default:
 			return nil, errInvalidLengthUsage
 		}
 
@@ -1362,7 +1349,7 @@ func skipObject(input []byte, i int) (int, error) {
 	nested := 0
 	instr := false
 	i++
-	for i < l && !(input[i] == unmark && nested == 0 && !instr) {
+	for i < l && (input[i] != unmark || nested != 0 || instr) {
 		ch := input[i]
 		if ch == '\\' {
 			i += 2
@@ -1374,9 +1361,10 @@ func skipObject(input []byte, i int) (int, error) {
 		if ch == '"' {
 			instr = !instr
 		} else if !instr {
-			if ch == mark {
+			switch ch {
+			case mark:
 				nested++
-			} else if ch == unmark {
+			case unmark:
 				nested--
 			}
 		}
@@ -1391,10 +1379,7 @@ func skipObject(input []byte, i int) (int, error) {
 
 func repool(node *tNode) {
 	// return nodes back to pool
-	for {
-		if node == nil {
-			break
-		}
+	for node != nil {
 		p := node.Next
 		nodePool.Put(node)
 		node = p
