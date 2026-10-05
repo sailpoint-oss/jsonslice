@@ -722,6 +722,11 @@ func arrayElemByIndex(input []byte, nod *tNode, inside bool) ([]byte, error) {
 		if err != nil || nod.Type&cDeep == 0 {
 			return res, err
 		}
+		// A terminal slice is an uncapped view of the input. Deep scan appends
+		// more matches onto res, so copy before that write can land in the input.
+		if cap(res) > len(res) {
+			res = bytes.Clone(res)
+		}
 	}
 	// $[1,...] or $..[1,...]
 	return collectRecurse(input, nod, elems, res, inside) // process elems + deepscan inside
@@ -1035,14 +1040,18 @@ func valuate(input []byte, i int) (int, int, int, error) {
 	return s, e, i, err
 }
 
+// plus appends val to an aggregated result and inserts a comma between elements.
+// Spare capacity is reused. val may be a subslice of the caller's input, so an
+// empty accumulator is copied before it is grown.
 func plus(res []byte, val []byte) []byte {
 	if len(val) == 0 {
 		return res
 	}
-	if len(res) > 0 {
-		res = append(res[:len(res):len(res)], ',')
+	if len(res) == 0 {
+		return bytes.Clone(val)
 	}
-	return append(res[:len(res):len(res)], val...)
+	res = append(res, ',')
+	return append(res, val...)
 }
 
 type tElem struct {
