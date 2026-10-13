@@ -2,4 +2,4 @@ module github.com/sailpoint-oss/jsonslice
 
 go 1.27
 
-require github.com/bhmj/xpression v0.9.1
+require github.com/bhmj/xpression v0.9.4
